@@ -21,3 +21,25 @@ uvicorn app.main:app --reload --port 8000
 - `GET /api/insights`
 
 The current implementation uses deterministic synthetic data so the frontend works immediately.
+
+## AI Services
+
+The AI/backend-services work lives in:
+
+```text
+app/services/
+```
+
+Main service entry point:
+
+```python
+from app.services.ai_pipeline import run_ai_pipeline
+```
+
+Tracing flow:
+
+```text
+records -> anomalies -> forecast -> alerts -> insights -> trace
+```
+
+See `../docs/backend-ai-services.md` for the collaboration split.

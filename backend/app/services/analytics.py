@@ -37,6 +37,8 @@ def weekly_volume(records: list[PatientRecord]) -> list[dict[str, int]]:
 
 
 def current_environment(signals: list[EnvironmentalSignal]) -> list[EnvironmentalSignal]:
+    if not signals:
+        return []
     latest_week = max(signal.week for signal in signals)
     return [signal for signal in signals if signal.week == latest_week]
 
@@ -54,3 +56,32 @@ def condition_growth(records: list[PatientRecord], district: str, condition: str
     if previous == 0:
         return 0
     return (current - previous) / previous
+
+
+def condition_history(
+    records: list[PatientRecord], district: str, condition: str
+) -> list[dict[str, int]]:
+    history = [
+        {"week": record.week, "visits": record.visits}
+        for record in records
+        if record.district == district and record.condition == condition
+    ]
+    return sorted(history, key=lambda item: item["week"])
+
+
+def district_wait_pressure(records: list[PatientRecord]) -> list[dict[str, int]]:
+    district_visits: dict[str, int] = defaultdict(int)
+    weighted_waits: dict[str, int] = defaultdict(int)
+
+    for record in records:
+        district_visits[record.district] += record.visits
+        weighted_waits[record.district] += record.avg_wait_minutes * record.visits
+
+    return [
+        {
+            "district": district,
+            "average_wait_minutes": round(weighted_waits[district] / visits),
+        }
+        for district, visits in sorted(district_visits.items())
+        if visits
+    ]
