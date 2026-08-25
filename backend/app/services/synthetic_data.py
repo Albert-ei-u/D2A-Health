@@ -4,6 +4,34 @@ WEEKS = ["2026-W19", "2026-W20", "2026-W21", "2026-W22", "2026-W23", "2026-W24"]
 DISTRICTS = ["Gasabo", "Kicukiro", "Nyarugenge"]
 CONDITIONS = ["Malaria", "Respiratory infection", "Diarrheal disease", "Hypertension"]
 AGE_GROUPS = ["0-5", "6-17", "18-59", "60+"]
+FACILITIES_BY_DISTRICT = {
+    "Gasabo": ["Kacyiru Health Centre", "Gasabo District Hospital"],
+    "Kicukiro": ["Masaka Health Centre", "Kicukiro District Hospital"],
+    "Nyarugenge": ["Muhima Health Centre", "Nyarugenge District Hospital"],
+}
+
+CONDITION_PROFILES = {
+    "Malaria": {"baseline": 24, "weekly_trend": 3, "admission_rate": 0.09, "wait_impact": 0.45},
+    "Respiratory infection": {
+        "baseline": 20,
+        "weekly_trend": 2,
+        "admission_rate": 0.07,
+        "wait_impact": 0.38,
+    },
+    "Diarrheal disease": {"baseline": 15, "weekly_trend": 1, "admission_rate": 0.06, "wait_impact": 0.34},
+    "Hypertension": {"baseline": 13, "weekly_trend": 1, "admission_rate": 0.12, "wait_impact": 0.28},
+}
+
+DISTRICT_LOAD_FACTORS = {
+    "Gasabo": 1.18,
+    "Kicukiro": 1.0,
+    "Nyarugenge": 0.88,
+}
+
+FACILITY_LOAD_FACTORS = {
+    "Health Centre": 0.46,
+    "District Hospital": 0.68,
+}
 
 
 def build_patient_records() -> list[PatientRecord]:
@@ -11,29 +39,42 @@ def build_patient_records() -> list[PatientRecord]:
     counter = 1
 
     for week_index, week in enumerate(WEEKS):
-        for district_index, district in enumerate(DISTRICTS):
+        for district in DISTRICTS:
             for condition_index, condition in enumerate(CONDITIONS):
-                baseline = 18 + (district_index * 4) + (condition_index * 3)
-                trend = week_index * (2 if condition in {"Malaria", "Respiratory infection"} else 1)
-                spike = 24 if week == "2026-W24" and district == "Gasabo" and condition == "Malaria" else 0
-                visits = baseline + trend + spike
-                admissions = max(1, round(visits * (0.08 + condition_index * 0.01)))
-                wait = 28 + district_index * 6 + week_index * 2 + (10 if visits > 45 else 0)
-
-                records.append(
-                    PatientRecord(
-                        record_id=f"anon-{counter:04d}",
-                        facility=f"{district} District Hospital",
-                        district=district,
-                        week=week,
-                        age_group=AGE_GROUPS[(week_index + condition_index) % len(AGE_GROUPS)],
-                        condition=condition,
-                        visits=visits,
-                        admissions=admissions,
-                        avg_wait_minutes=wait,
+                profile = CONDITION_PROFILES[condition]
+                for facility_index, facility in enumerate(FACILITIES_BY_DISTRICT[district]):
+                    facility_factor_key = (
+                        "District Hospital" if "District Hospital" in facility else "Health Centre"
                     )
-                )
-                counter += 1
+                    seasonal_pressure = 1 + (week_index * profile["weekly_trend"] * 0.035)
+                    local_variation = 1 + (((week_index + condition_index + facility_index) % 3) - 1) * 0.04
+                    spike = _outbreak_spike(week, district, condition, facility)
+                    visits = round(
+                        profile["baseline"]
+                        * DISTRICT_LOAD_FACTORS[district]
+                        * FACILITY_LOAD_FACTORS[facility_factor_key]
+                        * seasonal_pressure
+                        * local_variation
+                    ) + spike
+                    admissions = max(1, round(visits * profile["admission_rate"]))
+                    wait = round(22 + visits * profile["wait_impact"] + week_index * 1.7 + spike * 0.22)
+
+                    records.append(
+                        PatientRecord(
+                            record_id=f"anon-{counter:04d}",
+                            facility=facility,
+                            district=district,
+                            week=week,
+                            age_group=AGE_GROUPS[
+                                (week_index + condition_index + facility_index) % len(AGE_GROUPS)
+                            ],
+                            condition=condition,
+                            visits=visits,
+                            admissions=admissions,
+                            avg_wait_minutes=wait,
+                        )
+                    )
+                    counter += 1
 
     return records
 
@@ -58,3 +99,13 @@ def build_environmental_signals() -> list[EnvironmentalSignal]:
                 )
             )
     return signals
+
+
+def _outbreak_spike(week: str, district: str, condition: str, facility: str) -> int:
+    if week == "2026-W24" and district == "Gasabo" and condition == "Malaria":
+        return 34 if "District Hospital" in facility else 22
+    if week == "2026-W23" and district == "Nyarugenge" and condition == "Respiratory infection":
+        return 12 if "District Hospital" in facility else 7
+    if week == "2026-W24" and district == "Kicukiro" and condition == "Diarrheal disease":
+        return 10 if "District Hospital" in facility else 6
+    return 0

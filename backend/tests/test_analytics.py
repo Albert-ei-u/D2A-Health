@@ -1,8 +1,21 @@
+from fastapi.testclient import TestClient
+
+from app.main import app
 from app.services.alert_engine import generate_alerts
-from app.services.analytics import average_wait, top_conditions, total_visits, weekly_volume
+from app.services.analytics import (
+    anomaly_summary,
+    average_wait,
+    disease_trends,
+    patient_volume_analysis,
+    top_conditions,
+    total_visits,
+    weekly_volume,
+)
 from app.services.ai_pipeline import run_ai_pipeline
 from app.services.anomaly_detection import detect_condition_anomalies
 from app.services.forecasting import forecast_total_volume
+from app.services.gemini_client import GeminiInsightResult
+from app.services import insight_engine
 from app.services.synthetic_data import build_environmental_signals, build_patient_records
 
 
@@ -13,12 +26,20 @@ def test_dashboard_aggregations_are_populated() -> None:
     assert average_wait(records) > 0
     assert len(top_conditions(records)) == 4
     assert len(weekly_volume(records)) == 6
+    assert disease_trends(records)
+    assert patient_volume_analysis(records)
+    assert anomaly_summary(records)
 
 
 def test_alert_engine_detects_malaria_spike() -> None:
-    alerts = generate_alerts(build_patient_records())
+    alerts = generate_alerts(build_patient_records(), build_environmental_signals())
 
-    assert any(alert.condition == "Malaria" and alert.district == "Gasabo" for alert in alerts)
+    malaria_alert = next(
+        alert for alert in alerts if alert.condition == "Malaria" and alert.district == "Gasabo"
+    )
+    assert malaria_alert.confidence >= 0.65
+    assert any("rainfall" in item for item in malaria_alert.evidence)
+    assert any("baseline" in item for item in malaria_alert.evidence)
 
 
 def test_anomaly_detection_scores_current_spike() -> None:
@@ -46,3 +67,37 @@ def test_ai_pipeline_returns_traceable_outputs() -> None:
     assert result.anomalies
     assert result.trace["pipeline"] == "ai-services-pipeline"
     assert len(result.trace["steps"]) >= 5
+
+
+def test_dashboard_endpoint_returns_mvp_analysis_sections() -> None:
+    response = TestClient(app).get("/api/dashboard")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["disease_trends"]
+    assert payload["patient_volume_analysis"]
+    assert payload["anomaly_signals"]
+    assert payload["alerts"]
+    assert payload["insights"]
+
+
+def test_insight_engine_can_include_mocked_gemini_recommendation(monkeypatch) -> None:
+    def fake_gemini(context: dict[str, object]) -> GeminiInsightResult:
+        return GeminiInsightResult(
+            title="Gemini recommends targeted malaria readiness",
+            summary="Focus readiness on the district and condition with the strongest signal.",
+            recommendations=["Validate the alert.", "Check supplies.", "Review staffing."],
+            confidence=0.82,
+            model="gemini-test",
+        )
+
+    monkeypatch.setattr(insight_engine, "generate_gemini_health_insight", fake_gemini)
+
+    insights = insight_engine.generate_insights(
+        build_patient_records(),
+        build_environmental_signals(),
+    )
+
+    assert insights[0].id == "gemini-ai-recommendation"
+    assert insights[0].confidence == 0.82
+    assert any("Gemini model" in item for item in insights[0].evidence)

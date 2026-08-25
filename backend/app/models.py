@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -55,8 +56,26 @@ class DashboardSummary(BaseModel):
     total_admissions: int
     active_alerts: int
     average_wait_minutes: int
-    top_conditions: list[dict[str, int]]
-    weekly_volume: list[dict[str, int]]
+    top_conditions: list[dict[str, Any]]
+    weekly_volume: list[dict[str, Any]]
+    disease_trends: list[dict[str, Any]]
+    patient_volume_analysis: list[dict[str, Any]]
+    anomaly_signals: list[dict[str, Any]]
     environmental_context: list[EnvironmentalSignal]
     alerts: list[Alert]
     insights: list[Insight]
+
+
+class AIPipelineResponse(BaseModel):
+    alerts: list[Alert]
+    insights: list[Insight]
+    anomalies: list[dict[str, Any]]
+    forecast: dict[str, Any]
+    trace: dict[str, Any]
+
+
+class IngestionResult(BaseModel):
+    accepted_records: int
+    rejected_records: int
+    records: list[PatientRecord]
+    errors: list[str]

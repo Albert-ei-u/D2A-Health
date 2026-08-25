@@ -1,6 +1,11 @@
 import os
 from dataclasses import dataclass
 
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -8,6 +13,9 @@ class Settings:
     app_env: str = os.getenv("APP_ENV", "development")
     frontend_origin: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./d2a_health.db")
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+    gemini_timeout_seconds: float = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "8"))
 
 
 settings = Settings()
