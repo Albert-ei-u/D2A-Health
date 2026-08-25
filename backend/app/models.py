@@ -52,6 +52,7 @@ class Insight(BaseModel):
 
 
 class DashboardSummary(BaseModel):
+    active_data_source: str
     total_visits: int
     total_admissions: int
     active_alerts: int
@@ -67,6 +68,7 @@ class DashboardSummary(BaseModel):
 
 
 class AIPipelineResponse(BaseModel):
+    active_data_source: str
     alerts: list[Alert]
     insights: list[Insight]
     anomalies: list[dict[str, Any]]

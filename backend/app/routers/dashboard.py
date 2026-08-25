@@ -13,19 +13,21 @@ from app.services.analytics import (
     total_visits,
     weekly_volume,
 )
+from app.services.dataset_store import active_data_source, get_active_patient_records
 from app.services.insight_engine import generate_insights
-from app.services.synthetic_data import build_environmental_signals, build_patient_records
+from app.services.synthetic_data import build_environmental_signals
 
 router = APIRouter()
 
 
 @router.get("", response_model=DashboardSummary)
 def get_dashboard() -> DashboardSummary:
-    records = build_patient_records()
+    records = get_active_patient_records()
     environmental_signals = build_environmental_signals()
     alerts = generate_alerts(records, environmental_signals)
 
     return DashboardSummary(
+        active_data_source=active_data_source(),
         total_visits=total_visits(records),
         total_admissions=total_admissions(records),
         active_alerts=len(alerts),

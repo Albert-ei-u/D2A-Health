@@ -16,6 +16,7 @@ from app.services.anomaly_detection import detect_condition_anomalies
 from app.services.forecasting import forecast_total_volume
 from app.services.gemini_client import GeminiInsightResult
 from app.services import insight_engine
+from app.services.dataset_store import clear_uploaded_patient_records
 from app.services.synthetic_data import build_environmental_signals, build_patient_records
 
 
@@ -70,6 +71,7 @@ def test_ai_pipeline_returns_traceable_outputs() -> None:
 
 
 def test_dashboard_endpoint_returns_mvp_analysis_sections() -> None:
+    clear_uploaded_patient_records()
     response = TestClient(app).get("/api/dashboard")
 
     assert response.status_code == 200
@@ -101,3 +103,32 @@ def test_insight_engine_can_include_mocked_gemini_recommendation(monkeypatch) ->
     assert insights[0].id == "gemini-ai-recommendation"
     assert insights[0].confidence == 0.82
     assert any("Gemini model" in item for item in insights[0].evidence)
+
+
+def test_csv_upload_becomes_active_dataset_for_dashboard() -> None:
+    clear_uploaded_patient_records()
+    csv_content = (
+        "record_id,facility,district,week,age_group,condition,visits,admissions,avg_wait_minutes\n"
+        "csv-001,Demo Clinic,Demo,2026-W21,18-59,Malaria,10,1,20\n"
+        "csv-002,Demo Clinic,Demo,2026-W22,18-59,Malaria,12,1,22\n"
+        "csv-003,Demo Clinic,Demo,2026-W23,18-59,Malaria,13,1,24\n"
+        "csv-004,Demo Clinic,Demo,2026-W24,18-59,Malaria,40,3,45\n"
+    )
+
+    client = TestClient(app)
+    upload_response = client.post(
+        "/api/ingestion/patient-csv",
+        files={"file": ("records.csv", csv_content, "text/csv")},
+    )
+    dashboard_response = client.get("/api/dashboard")
+    clear_response = client.delete("/api/ingestion/patient-csv")
+
+    assert upload_response.status_code == 200
+    assert upload_response.json()["accepted_records"] == 4
+    assert dashboard_response.status_code == 200
+    payload = dashboard_response.json()
+    assert payload["active_data_source"] == "csv_upload"
+    assert payload["total_visits"] == 75
+    assert payload["alerts"]
+    assert payload["insights"]
+    assert clear_response.json()["active_data_source"] == "synthetic"

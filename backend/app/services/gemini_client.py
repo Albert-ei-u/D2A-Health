@@ -10,20 +10,6 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-GEMINI_RESPONSE_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "title": {"type": "string"},
-        "summary": {"type": "string"},
-        "recommendations": {
-            "type": "array",
-            "items": {"type": "string"},
-        },
-        "confidence": {"type": "number"},
-    },
-    "required": ["title", "summary", "recommendations", "confidence"],
-}
-
 
 @dataclass(frozen=True)
 class GeminiInsightResult:
@@ -47,46 +33,29 @@ def generate_gemini_health_insight(context: dict[str, object]) -> GeminiInsightR
         logger.warning("Gemini insight skipped because the API returned no usable text.")
         return None
 
-    parsed_text = _extract_json_object(response_text)
-    try:
-        parsed = json.loads(parsed_text)
-    except json.JSONDecodeError:
-        parsed_lines = _parse_line_response(response_text)
-        if parsed_lines:
-            return GeminiInsightResult(
-                title=parsed_lines["title"],
-                summary=parsed_lines["summary"],
-                recommendations=parsed_lines["recommendations"],
-                confidence=0.7,
-                model=settings.gemini_model,
-            )
-
-        partial_json = _parse_partial_json(response_text)
-        if partial_json:
-            return partial_json
-
-        logger.warning("Gemini returned non-JSON text: %s", response_text[:300])
+    parsed_lines = _parse_line_response(response_text)
+    if parsed_lines:
         return GeminiInsightResult(
-            title="Gemini recommendation",
-            summary=response_text.strip()[:500],
-            recommendations=[
-                "Validate Gemini's recommendation with facility-level evidence.",
-                "Use this as decision support, not an automated clinical decision.",
-            ],
-            confidence=0.62,
+            title=parsed_lines["title"],
+            summary=parsed_lines["summary"],
+            recommendations=parsed_lines["recommendations"],
+            confidence=0.72,
             model=settings.gemini_model,
-            raw_preview=response_text.strip()[:220],
         )
 
-    recommendations = parsed.get("recommendations", [])
-    if not isinstance(recommendations, list):
-        recommendations = []
+    parsed_json = _parse_json_response(response_text)
+    if parsed_json:
+        return parsed_json
 
+    logger.warning("Gemini returned an unparseable response: %s", response_text[:300])
     return GeminiInsightResult(
-        title=str(parsed.get("title") or "Gemini recommendation"),
-        summary=str(parsed.get("summary") or response_text.strip()[:500]),
-        recommendations=[str(item) for item in recommendations[:4]],
-        confidence=_bounded_confidence(parsed.get("confidence", 0.68)),
+        title="Gemini recommendation",
+        summary=response_text.strip()[:500],
+        recommendations=[
+            "Validate Gemini's recommendation with facility-level evidence.",
+            "Use this as decision support, not an automated clinical decision.",
+        ],
+        confidence=0.62,
         model=settings.gemini_model,
         raw_preview=response_text.strip()[:220],
     )
@@ -106,7 +75,7 @@ def _generate_content(prompt: str) -> str | None:
         ],
         "generationConfig": {
             "temperature": 0.2,
-            "maxOutputTokens": 500,
+            "maxOutputTokens": 220,
         },
     }
     request = Request(
@@ -161,13 +130,37 @@ def _build_prompt(context: dict[str, object]) -> str:
     return (
         "You are supporting a public-health MVP dashboard using only anonymized, "
         "aggregate synthetic data. Do not infer individual patient details. "
-        "Return exactly five lines using this format:\n"
+        "Do not return JSON. Do not use braces. Return exactly five lines using this format:\n"
         "TITLE: short title\n"
-        "SUMMARY: two concise sentences\n"
-        "RECOMMENDATION 1: practical district health action\n"
-        "RECOMMENDATION 2: practical district health action\n"
-        "RECOMMENDATION 3: practical district health action\n\n"
+        "SUMMARY: one sentence under 25 words\n"
+        "RECOMMENDATION 1: action under 15 words\n"
+        "RECOMMENDATION 2: action under 15 words\n"
+        "RECOMMENDATION 3: action under 15 words\n\n"
         f"Dashboard context:\n{json.dumps(context, indent=2)}"
+    )
+
+
+def _parse_json_response(text: str) -> GeminiInsightResult | None:
+    parsed_text = _extract_json_object(text)
+    try:
+        parsed = json.loads(parsed_text)
+    except json.JSONDecodeError:
+        return None
+
+    recommendations = parsed.get("recommendations", [])
+    if not isinstance(recommendations, list):
+        recommendations = []
+
+    return GeminiInsightResult(
+        title=str(parsed.get("title") or "Gemini recommendation"),
+        summary=str(parsed.get("summary") or text.strip()[:500]),
+        recommendations=[str(item) for item in recommendations[:4]]
+        or [
+            "Validate the AI recommendation with facility staff.",
+            "Compare against local surveillance before escalation.",
+        ],
+        confidence=_bounded_confidence(parsed.get("confidence", 0.68)),
+        model=settings.gemini_model,
     )
 
 
@@ -228,51 +221,3 @@ def _parse_line_response(text: str) -> dict[str, object] | None:
         ],
     }
 
-
-def _parse_partial_json(text: str) -> GeminiInsightResult | None:
-    title = _extract_json_string_value(text, "title")
-    summary = _extract_json_string_value(text, "summary")
-    if not title or not summary:
-        return None
-
-    return GeminiInsightResult(
-        title=title,
-        summary=summary,
-        recommendations=[
-            "Validate Gemini's recommendation with facility-level evidence.",
-            "Compare with staffing, supplies, and local surveillance.",
-            "Use this as decision support, not an automated clinical decision.",
-        ],
-        confidence=0.66,
-        model=settings.gemini_model,
-        raw_preview=text.strip()[:220],
-    )
-
-
-def _extract_json_string_value(text: str, key: str) -> str | None:
-    marker = f'"{key}"'
-    marker_index = text.find(marker)
-    if marker_index == -1:
-        return None
-    colon_index = text.find(":", marker_index + len(marker))
-    if colon_index == -1:
-        return None
-    first_quote = text.find('"', colon_index + 1)
-    if first_quote == -1:
-        return None
-
-    chars: list[str] = []
-    escaped = False
-    for char in text[first_quote + 1 :]:
-        if escaped:
-            chars.append(char)
-            escaped = False
-        elif char == "\\":
-            escaped = True
-        elif char == '"':
-            break
-        else:
-            chars.append(char)
-
-    value = "".join(chars).strip()
-    return value or None
