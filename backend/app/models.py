@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -19,6 +20,19 @@ class PatientRecord(BaseModel):
     visits: int = Field(ge=0)
     admissions: int = Field(ge=0)
     avg_wait_minutes: int = Field(ge=0)
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+class FacilityLocation(BaseModel):
+    facility: str
+    district: str
+    latitude: float
+    longitude: float
+    latest_week: str
+    total_visits: int
+    active_conditions: list[str]
+    data_source: str
 
 
 class EnvironmentalSignal(BaseModel):
@@ -51,12 +65,32 @@ class Insight(BaseModel):
 
 
 class DashboardSummary(BaseModel):
+    active_data_source: str
     total_visits: int
     total_admissions: int
     active_alerts: int
     average_wait_minutes: int
-    top_conditions: list[dict[str, int]]
-    weekly_volume: list[dict[str, int]]
+    top_conditions: list[dict[str, Any]]
+    weekly_volume: list[dict[str, Any]]
+    disease_trends: list[dict[str, Any]]
+    patient_volume_analysis: list[dict[str, Any]]
+    anomaly_signals: list[dict[str, Any]]
     environmental_context: list[EnvironmentalSignal]
     alerts: list[Alert]
     insights: list[Insight]
+
+
+class AIPipelineResponse(BaseModel):
+    active_data_source: str
+    alerts: list[Alert]
+    insights: list[Insight]
+    anomalies: list[dict[str, Any]]
+    forecast: dict[str, Any]
+    trace: dict[str, Any]
+
+
+class IngestionResult(BaseModel):
+    accepted_records: int
+    rejected_records: int
+    records: list[PatientRecord]
+    errors: list[str]
