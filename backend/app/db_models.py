@@ -18,3 +18,12 @@ class PatientRecordRow(Base):
     avg_wait_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+class UserRow(Base):
+    __tablename__ = "users"
+
+    email: Mapped[str] = mapped_column(String(320), primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(300), nullable=False)
+    role: Mapped[str] = mapped_column(String(80), nullable=False)
