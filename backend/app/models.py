@@ -10,6 +10,33 @@ class AlertSeverity(str, Enum):
     high = "high"
 
 
+class UserRole(str, Enum):
+    health_data_analyst = "Health Data Analyst"
+    clinician = "Clinician"
+    facility_manager = "Facility Manager"
+    administrator = "Administrator"
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=3)
+    password: str = Field(min_length=1)
+
+
+class UserProfile(BaseModel):
+    email: str
+    name: str
+    role: UserRole
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserProfile
+    name: str
+    role: UserRole
+    email: str
+
+
 class PatientRecord(BaseModel):
     record_id: str
     facility: str
@@ -94,3 +121,4 @@ class IngestionResult(BaseModel):
     rejected_records: int
     records: list[PatientRecord]
     errors: list[str]
+    active_data_source: str = "synthetic"

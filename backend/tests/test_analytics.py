@@ -14,6 +14,7 @@ from app.services.analytics import (
 )
 from app.services.ai_pipeline import run_ai_pipeline
 from app.services.anomaly_detection import detect_condition_anomalies
+from app.services.data_ingestion import parse_patient_csv
 from app.services.forecasting import forecast_total_volume
 from app.services.gemini_client import GeminiInsightResult
 from app.services import insight_engine
@@ -166,3 +167,19 @@ def test_csv_upload_can_supply_exact_map_locations() -> None:
     assert locations[0]["latitude"] == -1.95
     assert locations[0]["longitude"] == 30.06
     assert locations[0]["total_visits"] == 40
+
+
+def test_csv_ingestion_rejects_duplicate_ids_and_invalid_admissions() -> None:
+    csv_content = (
+        "record_id,facility,district,week,age_group,condition,visits,admissions,avg_wait_minutes\n"
+        "row-001,Demo Clinic,Demo,2026-W23,18-59,Malaria,10,2,20\n"
+        "row-002,Demo Clinic,Demo,2026-W24,18-59,Malaria,8,9,20\n"
+        "row-001,Demo Clinic,Demo,2026-W24,18-59,Malaria,8,1,20\n"
+    )
+
+    result = parse_patient_csv(csv_content)
+
+    assert result.accepted_records == 1
+    assert result.rejected_records == 2
+    assert any("admissions cannot exceed visits" in error for error in result.errors)
+    assert any("duplicate record_id" in error for error in result.errors)
