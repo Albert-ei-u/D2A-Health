@@ -20,6 +20,9 @@ const fallbackData: DashboardSummary = {
   average_wait_minutes: 0,
   top_conditions: [],
   weekly_volume: [],
+  disease_trends: [],
+  patient_volume_analysis: [],
+  anomaly_signals: [],
   environmental_context: [],
   alerts: [],
   insights: [],
@@ -139,6 +142,21 @@ export function App() {
           </div>
 
           <div className="panel">
+            <PanelHeader title="Volume Pressure" icon={<Users size={18} />} />
+            <div className="rank-list">
+              {dashboard.patient_volume_analysis.map((item) => (
+                <div className="pressure-row" key={item.district}>
+                  <div>
+                    <strong>{item.district}</strong>
+                    <span>{item.latest_week_visits} visits this week</span>
+                  </div>
+                  <span className={`pill ${item.pressure_level}`}>{item.pressure_level}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="panel">
             <PanelHeader title="Environmental Context" icon={<CloudRain size={18} />} />
             <div className="context-list">
               {dashboard.environmental_context.map((item) => (
@@ -146,6 +164,20 @@ export function App() {
                   <strong>{item.district}</strong>
                   <span>{item.rainfall_mm} mm rain</span>
                   <span>{item.temperature_c.toFixed(1)} C</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="panel wide">
+            <PanelHeader title="Disease Trends" icon={<Activity size={18} />} />
+            <div className="table-list">
+              {dashboard.disease_trends.slice(0, 6).map((item) => (
+                <div className="table-row" key={`${item.district}-${item.condition}`}>
+                  <span>{item.condition}</span>
+                  <span>{item.district}</span>
+                  <strong>{item.week_over_week_change_percent}%</strong>
+                  <span className={`pill ${item.trend}`}>{item.trend}</span>
                 </div>
               ))}
             </div>
@@ -160,9 +192,24 @@ export function App() {
                     <span className="severity">{severityLabels[alert.severity]}</span>
                     <h2>{alert.title}</h2>
                     <p>{alert.message}</p>
+                    <small>{alert.evidence[0]}</small>
                   </div>
                   <strong>{Math.round(alert.confidence * 100)}%</strong>
                 </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelHeader title="Anomaly Signals" icon={<AlertTriangle size={18} />} />
+            <div className="rank-list">
+              {dashboard.anomaly_signals.slice(0, 5).map((item) => (
+                <div className="rank-row" key={`${item.district}-${item.condition}-${item.week}`}>
+                  <span>
+                    {item.condition} · {item.district}
+                  </span>
+                  <strong>{Math.round(item.score * 100)}%</strong>
+                </div>
               ))}
             </div>
           </div>

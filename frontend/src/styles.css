@@ -254,7 +254,9 @@ h1 {
 }
 
 .rank-row,
-.context-row {
+.context-row,
+.pressure-row,
+.table-row {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -267,10 +269,32 @@ h1 {
   grid-template-columns: 1fr auto auto;
 }
 
+.pressure-row {
+  align-items: center;
+}
+
+.pressure-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.table-list {
+  display: grid;
+  gap: 8px;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr auto auto;
+  align-items: center;
+}
+
 .rank-row span,
+.pressure-row span,
 .context-row span,
 .insight-card p,
-.alert-card p {
+.alert-card p,
+.alert-card small {
   color: #617876;
 }
 
@@ -308,7 +332,8 @@ h1 {
 }
 
 .severity,
-.insight-card span {
+.insight-card span,
+.pill {
   display: inline-flex;
   color: #0d675c;
   background: #e7f6f2;
@@ -317,6 +342,28 @@ h1 {
   font-size: 0.78rem;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.pill.high,
+.pill.rising {
+  color: #8f1f1f;
+  background: #ffe8e8;
+}
+
+.pill.medium {
+  color: #7a4d00;
+  background: #fff2d7;
+}
+
+.pill.low,
+.pill.stable {
+  color: #0d675c;
+  background: #e7f6f2;
+}
+
+.pill.falling {
+  color: #265985;
+  background: #e4f1ff;
 }
 
 .insight-card ul {
@@ -387,5 +434,9 @@ h1 {
 
   .bar-chart {
     grid-template-columns: repeat(6, minmax(28px, 1fr));
+  }
+
+  .table-row {
+    grid-template-columns: 1fr;
   }
 }
