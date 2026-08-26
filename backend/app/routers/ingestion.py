@@ -2,7 +2,11 @@ from fastapi import APIRouter, File, UploadFile
 
 from app.models import IngestionResult
 from app.services.data_ingestion import parse_patient_csv
-from app.services.dataset_store import clear_uploaded_patient_records, replace_uploaded_patient_records
+from app.services.dataset_store import (
+    active_data_source,
+    clear_uploaded_patient_records,
+    replace_uploaded_patient_records,
+)
 
 router = APIRouter()
 
@@ -13,6 +17,7 @@ async def ingest_patient_csv(file: UploadFile = File(...)) -> IngestionResult:
     result = parse_patient_csv(content)
     if result.records:
         replace_uploaded_patient_records(result.records)
+        result.active_data_source = active_data_source()
     return result
 
 
