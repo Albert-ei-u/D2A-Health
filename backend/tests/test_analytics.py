@@ -6,6 +6,7 @@ from app.services.analytics import (
     anomaly_summary,
     average_wait,
     disease_trends,
+    facility_locations,
     patient_volume_analysis,
     top_conditions,
     total_visits,
@@ -30,6 +31,7 @@ def test_dashboard_aggregations_are_populated() -> None:
     assert disease_trends(records)
     assert patient_volume_analysis(records)
     assert anomaly_summary(records)
+    assert facility_locations(records, "synthetic")
 
 
 def test_alert_engine_detects_malaria_spike() -> None:
@@ -85,6 +87,10 @@ def test_dashboard_endpoint_returns_mvp_analysis_sections() -> None:
 
 def test_insight_engine_can_include_mocked_gemini_recommendation(monkeypatch) -> None:
     def fake_gemini(context: dict[str, object]) -> GeminiInsightResult:
+        priority_locations = context["priority_locations"]
+        assert priority_locations
+        assert priority_locations[0]["latitude"]
+        assert priority_locations[0]["longitude"]
         return GeminiInsightResult(
             title="Gemini recommends targeted malaria readiness",
             summary="Focus readiness on the district and condition with the strongest signal.",
@@ -132,3 +138,31 @@ def test_csv_upload_becomes_active_dataset_for_dashboard() -> None:
     assert payload["alerts"]
     assert payload["insights"]
     assert clear_response.json()["active_data_source"] == "synthetic"
+
+
+def test_csv_upload_can_supply_exact_map_locations() -> None:
+    clear_uploaded_patient_records()
+    csv_content = (
+        "record_id,facility,district,week,age_group,condition,visits,admissions,"
+        "avg_wait_minutes,latitude,longitude\n"
+        "csv-001,Demo Clinic,Demo,2026-W21,18-59,Malaria,10,1,20,-1.9500,30.0600\n"
+        "csv-002,Demo Clinic,Demo,2026-W22,18-59,Malaria,12,1,22,-1.9500,30.0600\n"
+        "csv-003,Demo Clinic,Demo,2026-W23,18-59,Malaria,13,1,24,-1.9500,30.0600\n"
+        "csv-004,Demo Clinic,Demo,2026-W24,18-59,Malaria,40,3,45,-1.9500,30.0600\n"
+    )
+
+    client = TestClient(app)
+    client.post(
+        "/api/ingestion/patient-csv",
+        files={"file": ("records.csv", csv_content, "text/csv")},
+    )
+    response = client.get("/api/records/locations")
+    clear_uploaded_patient_records()
+
+    assert response.status_code == 200
+    locations = response.json()
+    assert locations[0]["facility"] == "Demo Clinic"
+    assert locations[0]["data_source"] == "csv_upload"
+    assert locations[0]["latitude"] == -1.95
+    assert locations[0]["longitude"] == 30.06
+    assert locations[0]["total_visits"] == 40

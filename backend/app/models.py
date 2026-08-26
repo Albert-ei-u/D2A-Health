@@ -20,6 +20,19 @@ class PatientRecord(BaseModel):
     visits: int = Field(ge=0)
     admissions: int = Field(ge=0)
     avg_wait_minutes: int = Field(ge=0)
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+class FacilityLocation(BaseModel):
+    facility: str
+    district: str
+    latitude: float
+    longitude: float
+    latest_week: str
+    total_visits: int
+    active_conditions: list[str]
+    data_source: str
 
 
 class EnvironmentalSignal(BaseModel):

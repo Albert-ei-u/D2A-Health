@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from app.models import EnvironmentalSignal, PatientRecord
+from app.models import EnvironmentalSignal, FacilityLocation, PatientRecord
 from app.services.anomaly_detection import detect_condition_anomalies
 
 
@@ -134,6 +134,35 @@ def anomaly_summary(records: list[PatientRecord]) -> list[dict[str, int | float 
         }
         for signal in detect_condition_anomalies(records, include_watchlist=True)
     ]
+
+
+def facility_locations(records: list[PatientRecord], data_source: str) -> list[FacilityLocation]:
+    grouped: dict[str, list[PatientRecord]] = defaultdict(list)
+    for record in records:
+        if record.latitude is None or record.longitude is None:
+            continue
+        grouped[f"{record.district}|{record.facility}"].append(record)
+
+    locations: list[FacilityLocation] = []
+    for facility_records in grouped.values():
+        latest_week = max(record.week for record in facility_records)
+        latest_records = [record for record in facility_records if record.week == latest_week]
+        first = latest_records[0]
+
+        locations.append(
+            FacilityLocation(
+                facility=first.facility,
+                district=first.district,
+                latitude=first.latitude or 0,
+                longitude=first.longitude or 0,
+                latest_week=latest_week,
+                total_visits=sum(record.visits for record in latest_records),
+                active_conditions=sorted({record.condition for record in latest_records}),
+                data_source=data_source,
+            )
+        )
+
+    return sorted(locations, key=lambda location: location.total_visits, reverse=True)
 
 
 def current_environment(signals: list[EnvironmentalSignal]) -> list[EnvironmentalSignal]:

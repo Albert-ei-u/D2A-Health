@@ -9,6 +9,14 @@ FACILITIES_BY_DISTRICT = {
     "Kicukiro": ["Masaka Health Centre", "Kicukiro District Hospital"],
     "Nyarugenge": ["Muhima Health Centre", "Nyarugenge District Hospital"],
 }
+FACILITY_COORDINATES = {
+    "Kacyiru Health Centre": (-1.9326, 30.0870),
+    "Gasabo District Hospital": (-1.8847, 30.1127),
+    "Masaka Health Centre": (-1.9977, 30.2172),
+    "Kicukiro District Hospital": (-1.9738, 30.1044),
+    "Muhima Health Centre": (-1.9441, 30.0579),
+    "Nyarugenge District Hospital": (-1.9545, 30.0606),
+}
 
 CONDITION_PROFILES = {
     "Malaria": {"baseline": 24, "weekly_trend": 3, "admission_rate": 0.09, "wait_impact": 0.45},
@@ -72,6 +80,8 @@ def build_patient_records() -> list[PatientRecord]:
                             visits=visits,
                             admissions=admissions,
                             avg_wait_minutes=wait,
+                            latitude=FACILITY_COORDINATES[facility][0],
+                            longitude=FACILITY_COORDINATES[facility][1],
                         )
                     )
                     counter += 1

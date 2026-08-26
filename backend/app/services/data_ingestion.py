@@ -16,6 +16,7 @@ REQUIRED_COLUMNS = {
     "admissions",
     "avg_wait_minutes",
 }
+OPTIONAL_COORDINATE_COLUMNS = {"latitude", "longitude"}
 
 
 def parse_patient_csv(content: str) -> IngestionResult:
@@ -42,6 +43,8 @@ def parse_patient_csv(content: str) -> IngestionResult:
 
     for row_number, row in enumerate(reader, start=2):
         try:
+            latitude = _optional_float(row.get("latitude"))
+            longitude = _optional_float(row.get("longitude"))
             records.append(
                 PatientRecord(
                     record_id=row["record_id"],
@@ -53,6 +56,8 @@ def parse_patient_csv(content: str) -> IngestionResult:
                     visits=int(row["visits"]),
                     admissions=int(row["admissions"]),
                     avg_wait_minutes=int(row["avg_wait_minutes"]),
+                    latitude=latitude,
+                    longitude=longitude,
                 )
             )
         except (ValueError, ValidationError) as error:
@@ -64,3 +69,9 @@ def parse_patient_csv(content: str) -> IngestionResult:
         records=records,
         errors=errors,
     )
+
+
+def _optional_float(value: str | None) -> float | None:
+    if value is None or value.strip() == "":
+        return None
+    return float(value)
