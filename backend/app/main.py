@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
+from app.db import engine, init_db
 from app.routers import ai, alerts, auth, dashboard, ingestion, insights, records
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
@@ -15,9 +18,28 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+def initialize_database() -> None:
+    try:
+        init_db()
+    except SQLAlchemyError:
+        # The API can still serve synthetic data when the database is temporarily unavailable.
+        pass
+
+
 @app.get("/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok", "service": settings.app_name}
+
+
+@app.get("/health/db")
+def database_health_check() -> dict[str, str]:
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        return {"status": "connected", "database": "postgresql"}
+    except SQLAlchemyError:
+        return {"status": "unavailable", "database": "postgresql"}
 
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
