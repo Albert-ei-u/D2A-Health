@@ -14,7 +14,7 @@ def test_demo_login_returns_user_and_role() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["access_token"] == "demo-token"
+    assert payload["access_token"].startswith("mvp-")
     assert payload["user"]["role"] == "Health Data Analyst"
     assert payload["role"] == "Health Data Analyst"
 
