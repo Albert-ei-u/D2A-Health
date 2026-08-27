@@ -20,7 +20,6 @@ class PatientRecordRow(Base):
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-
 class UserPatientRecordRow(Base):
     __tablename__ = "user_patient_records"
 
