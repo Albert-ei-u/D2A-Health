@@ -129,7 +129,7 @@ def _generate_content(prompt: str) -> str | None:
 def _build_prompt(context: dict[str, object]) -> str:
     return (
         "You are supporting a public-health MVP dashboard using only anonymized, "
-        "aggregate synthetic data. Do not infer individual patient details. "
+        "aggregate anonymized facility data. Do not infer individual patient details. "
         "Do not return JSON. Do not use braces. Return exactly five lines using this format:\n"
         "TITLE: short title\n"
         "SUMMARY: one sentence under 25 words\n"
@@ -220,4 +220,3 @@ def _parse_line_response(text: str) -> dict[str, object] | None:
             "Compare against local surveillance before escalation.",
         ],
     }
-

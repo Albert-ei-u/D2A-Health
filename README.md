@@ -24,6 +24,26 @@ uvicorn app.main:app --reload --port 8000
 
 The API will be available at `http://localhost:8000`.
 
+### Database and CSV testing
+
+The backend uses `DATABASE_URL` from `backend/.env`. Verify the PostgreSQL connection with:
+
+```bash
+python -c "from sqlalchemy import text; from app.db import engine; connection=engine.connect(); print(connection.execute(text('SELECT 1')).scalar()); connection.close()"
+```
+
+Start the API and open `http://localhost:8000/docs`. Upload an anonymized CSV with
+`POST /api/ingestion/patient-csv`. Accepted records are persisted in the
+`patient_records` table and used by `/api/dashboard`, `/api/alerts`, `/api/insights`,
+and `/api/ai/pipeline`. Delete the upload with `DELETE /api/ingestion/patient-csv`
+to return to synthetic data.
+
+The development login is configured with `DEMO_LOGIN_EMAIL` and
+`DEMO_LOGIN_PASSWORD` in `.env`. The default values are `demo@d2a.health` and
+`demo-password`. New accounts can be created with `POST /api/auth/signup` and
+are stored in the `users` table with hashed passwords. This is an MVP login
+contract, not production authentication.
+
 ### Frontend
 
 ```bash

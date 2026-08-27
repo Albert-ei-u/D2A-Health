@@ -43,6 +43,16 @@ def forecast_total_volume(records: list[PatientRecord]) -> VolumeForecast:
     )
 
 
+def forecast_by_district(records: list[PatientRecord]) -> list[tuple[str, VolumeForecast, int]]:
+    results = []
+    for district in sorted({record.district for record in records}):
+        district_records = [record for record in records if record.district == district]
+        latest_week = max(record.week for record in district_records)
+        current = sum(record.visits for record in district_records if record.week == latest_week)
+        results.append((district, forecast_total_volume(district_records), current))
+    return results
+
+
 def _weekly_totals(records: list[PatientRecord]) -> dict[str, int]:
     totals: dict[str, int] = {}
     for record in sorted(records, key=lambda item: item.week):

@@ -69,7 +69,7 @@ def _alert_evidence(
         f"Historical baseline: {signal.baseline_visits} visits.",
         f"Absolute change: {signal.absolute_change} visits.",
         f"Anomaly score: {signal.score}.",
-        "Data source: anonymized facility-level synthetic records.",
+        "Data source: user-uploaded anonymized facility-level records.",
     ]
 
     context = _environment_for_signal(signal, environmental_signals or [])

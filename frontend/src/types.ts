@@ -27,6 +27,7 @@ export interface Insight {
   summary: string;
   considerations: string[];
   evidence: string[];
+  role_actions?: Record<string, string[]>;
 }
 
 export interface DiseaseTrend {
@@ -65,6 +66,7 @@ export interface AnomalySignal {
 }
 
 export interface DashboardSummary {
+  active_data_source?: string;
   total_visits: number;
   total_admissions: number;
   active_alerts: number;
@@ -77,4 +79,45 @@ export interface DashboardSummary {
   environmental_context: EnvironmentalSignal[];
   alerts: Alert[];
   insights: Insight[];
+  district_forecasts: Array<{ district: string; next_week: string; current_visits: number; predicted_visits: number; lower_bound: number; upper_bound: number; trend_direction: string; confidence: number }>;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: {
+    email: string;
+    name: string;
+    role: string;
+    health_center: string;
+    dataset_ready: boolean;
+  };
+  name: string;
+  role: string;
+  email: string;
+  health_center: string;
+  requires_data_upload: boolean;
+}
+
+export interface IngestionResult {
+  accepted_records: number;
+  rejected_records: number;
+  records: Array<Record<string, unknown>>;
+  errors: string[];
+  active_data_source: string;
+}
+
+export interface PatientRecord {
+  record_id: string;
+  facility: string;
+  district: string;
+  village?: string;
+  week: string;
+  age_group: string;
+  condition: string;
+  visits: number;
+  admissions: number;
+  avg_wait_minutes: number;
+  latitude?: number;
+  longitude?: number;
 }
