@@ -26,12 +26,25 @@ class SignupRequest(BaseModel):
     email: str = Field(min_length=3)
     password: str = Field(min_length=8)
     name: str = Field(min_length=2)
+    health_center: str = Field(min_length=2)
+
+
+class PasswordResetRequest(BaseModel):
+    email: str = Field(min_length=3)
+
+
+class PasswordResetConfirm(BaseModel):
+    email: str = Field(min_length=3)
+    code: str = Field(min_length=6, max_length=6)
+    new_password: str = Field(min_length=8)
 
 
 class UserProfile(BaseModel):
     email: str
     name: str
     role: UserRole
+    health_center: str = ""
+    dataset_ready: bool = False
 
 
 class LoginResponse(BaseModel):
@@ -41,12 +54,15 @@ class LoginResponse(BaseModel):
     name: str
     role: UserRole
     email: str
+    health_center: str = ""
+    requires_data_upload: bool = True
 
 
 class PatientRecord(BaseModel):
     record_id: str
     facility: str
     district: str
+    village: str | None = None
     week: str
     age_group: str
     condition: str
@@ -95,6 +111,18 @@ class Insight(BaseModel):
     summary: str
     considerations: list[str]
     evidence: list[str]
+    role_actions: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class DistrictForecast(BaseModel):
+    district: str
+    next_week: str
+    current_visits: int
+    predicted_visits: int
+    lower_bound: int
+    upper_bound: int
+    trend_direction: str
+    confidence: float = Field(ge=0, le=1)
 
 
 class DashboardSummary(BaseModel):
@@ -111,6 +139,7 @@ class DashboardSummary(BaseModel):
     environmental_context: list[EnvironmentalSignal]
     alerts: list[Alert]
     insights: list[Insight]
+    district_forecasts: list[DistrictForecast] = Field(default_factory=list)
 
 
 class AIPipelineResponse(BaseModel):
@@ -127,4 +156,4 @@ class IngestionResult(BaseModel):
     rejected_records: int
     records: list[PatientRecord]
     errors: list[str]
-    active_data_source: str = "synthetic"
+    active_data_source: str = "none"

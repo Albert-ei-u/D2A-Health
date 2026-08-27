@@ -94,7 +94,7 @@ def generate_insights(
             confidence=0.83,
             summary=(
                 "The top condition contributes the largest share of facility visits in the "
-                "synthetic MVP dataset."
+                "user-uploaded anonymized dataset."
             ),
             considerations=[
                 "Review stock levels for related diagnostics and treatment.",
@@ -117,7 +117,7 @@ def generate_insights(
             confidence=0.73,
             summary=(
                 f"{wait_pressure['district']} has an average wait of "
-                f"{wait_pressure['average_wait_minutes']} minutes across the synthetic records."
+                f"{wait_pressure['average_wait_minutes']} minutes across the uploaded records."
             ),
             considerations=[
                 "Compare patient arrival times with staffing coverage.",
@@ -300,8 +300,53 @@ def generate_insights(
             model=gemini_result.model,
         )
 
-    trace.add("insight-output", "Generated decision-support insights.", insight_count=len(insights))
+    for insight in insights:
+        insight.role_actions = _role_actions(insight)
+
+    trace.add("insight-output", "Generated decision-support insights with role-specific mitigation.", insight_count=len(insights))
     return insights
+
+
+def _role_actions(insight: Insight) -> dict[str, list[str]]:
+    subject = insight.title.rstrip(".")
+    actions = {
+        "doctors": [
+            f"Review {subject.lower()} with the clinical team and confirm the signal against patient assessment.",
+            "Apply approved diagnostic and treatment protocols; do not use this insight as an automatic diagnosis.",
+            "Document confirmed findings and escalate severe or rapidly worsening cases through local clinical pathways.",
+        ],
+        "nurses": [
+            "Repeat triage and record vital signs for patients linked to this signal.",
+            "Check queue, staffing, medicines, and diagnostic supplies before the next shift.",
+            "Escalate deterioration, unusual clusters, or supply shortages to the clinician in charge.",
+        ],
+        "health officials": [
+            "Validate the signal with facility reporting and community surveillance before public action.",
+            "Coordinate staffing, commodities, referral capacity, and outreach support for affected locations.",
+            "Set a review date and monitor whether the signal persists in the next reporting period.",
+        ],
+    }
+    peak_signal = insight.category in {"early warning", "capacity"} or any(
+        word in f"{insight.title} {insight.summary}".lower()
+        for word in ("rising", "surge", "peak", "pressure", "increase")
+    )
+    if peak_signal:
+        actions["nurses"].extend(
+            [
+                "Coordinate community health workers to contact affected households and offer early screening or referral.",
+                "Record outreach results and escalate people who cannot safely wait for a routine facility visit.",
+            ]
+        )
+        actions["health officials"].extend(
+            [
+                "Activate targeted outreach in the affected villages and communicate where screening or support is available.",
+                "Coordinate mobile teams, community health workers, transport, and supplies for the high-risk area.",
+            ]
+        )
+        actions["doctors"].append(
+            "Define referral criteria and a safe community screening protocol for outreach teams."
+        )
+    return actions
 
 
 def _priority_locations(

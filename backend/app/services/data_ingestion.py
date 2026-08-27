@@ -27,7 +27,7 @@ def parse_patient_csv(content: str) -> IngestionResult:
             rejected_records=0,
             records=[],
             errors=["CSV file is empty or missing a header row."],
-            active_data_source="synthetic",
+            active_data_source="none",
         )
 
     missing_columns = sorted(REQUIRED_COLUMNS - set(reader.fieldnames))
@@ -37,7 +37,7 @@ def parse_patient_csv(content: str) -> IngestionResult:
             rejected_records=0,
             records=[],
             errors=[f"Missing required columns: {', '.join(missing_columns)}."],
-            active_data_source="synthetic",
+            active_data_source="none",
         )
 
     records: list[PatientRecord] = []
@@ -53,6 +53,7 @@ def parse_patient_csv(content: str) -> IngestionResult:
 
             facility = _required_text(row.get("facility"), "facility")
             district = _required_text(row.get("district"), "district")
+            village = _optional_text(row.get("village"))
             week = _required_text(row.get("week"), "week")
             age_group = _required_text(row.get("age_group"), "age_group")
             condition = _required_text(row.get("condition"), "condition")
@@ -69,6 +70,7 @@ def parse_patient_csv(content: str) -> IngestionResult:
                     record_id=record_id,
                     facility=facility,
                     district=district,
+                    village=village,
                     week=week,
                     age_group=age_group,
                     condition=condition,
@@ -87,7 +89,7 @@ def parse_patient_csv(content: str) -> IngestionResult:
         rejected_records=len(errors),
         records=records,
         errors=errors,
-        active_data_source="csv_upload" if records else "synthetic",
+        active_data_source="csv_upload" if records else "none",
     )
 
 
@@ -102,3 +104,8 @@ def _required_text(value: str | None, field_name: str) -> str:
     if not cleaned:
         raise ValueError(f"{field_name} cannot be blank")
     return cleaned
+
+
+def _optional_text(value: str | None) -> str | None:
+    cleaned = (value or "").strip()
+    return cleaned or None

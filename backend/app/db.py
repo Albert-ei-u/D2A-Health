@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.core.config import settings
@@ -23,3 +23,29 @@ def init_db() -> None:
     from app import db_models
 
     Base.metadata.create_all(bind=engine)
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE user_patient_records ADD COLUMN IF NOT EXISTS village VARCHAR(120)"))
+            connection.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                    "health_center VARCHAR(200) NOT NULL DEFAULT ''"
+                )
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                    "dataset_ready BOOLEAN NOT NULL DEFAULT FALSE"
+                )
+            )
+    elif "health_center" not in {
+        column["name"] for column in inspect(engine).get_columns("users")
+    }:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE users ADD COLUMN health_center VARCHAR(200) DEFAULT ''"))
+
+    if "dataset_ready" not in {
+        column["name"] for column in inspect(engine).get_columns("users")
+    }:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE users ADD COLUMN dataset_ready BOOLEAN DEFAULT FALSE"))
