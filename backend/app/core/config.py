@@ -12,6 +12,7 @@ class Settings:
     app_name: str = os.getenv("APP_NAME", "D2A Health API")
     app_env: str = os.getenv("APP_ENV", "development")
     frontend_origin: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+    frontend_origins: str = os.getenv("FRONTEND_ORIGINS", "")
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./d2a_health.db")
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
