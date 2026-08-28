@@ -99,6 +99,12 @@ export interface AuthResponse {
   requires_data_upload: boolean;
 }
 
+export interface SignupResponse {
+  message: string;
+  verification_required: boolean;
+  development_code?: string;
+}
+
 export interface IngestionResult {
   accepted_records: number;
   rejected_records: number;

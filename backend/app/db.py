@@ -38,6 +38,12 @@ def init_db() -> None:
                     "dataset_ready BOOLEAN NOT NULL DEFAULT FALSE"
                 )
             )
+            connection.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                    "email_verified BOOLEAN NOT NULL DEFAULT TRUE"
+                )
+            )
     elif "health_center" not in {
         column["name"] for column in inspect(engine).get_columns("users")
     }:
@@ -49,3 +55,9 @@ def init_db() -> None:
     }:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE users ADD COLUMN dataset_ready BOOLEAN DEFAULT FALSE"))
+
+    if "email_verified" not in {
+        column["name"] for column in inspect(engine).get_columns("users")
+    }:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT TRUE"))

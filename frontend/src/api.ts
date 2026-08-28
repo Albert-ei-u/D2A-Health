@@ -1,4 +1,4 @@
-import type { Alert, AuthResponse, DashboardSummary, IngestionResult, Insight, PatientRecord } from "./types";
+import type { Alert, AuthResponse, DashboardSummary, IngestionResult, Insight, PatientRecord, SignupResponse } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 
@@ -52,12 +52,22 @@ export async function login(email: string, password: string): Promise<AuthRespon
   );
 }
 
-export async function signup(name: string, email: string, password: string, healthCenter: string): Promise<AuthResponse> {
+export async function signup(name: string, email: string, password: string, healthCenter: string): Promise<SignupResponse & Partial<AuthResponse>> {
   return parseResponse(
     fetch(`${API_BASE_URL}/api/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, password, health_center: healthCenter }),
+    })
+  );
+}
+
+export async function verifyEmail(email: string, code: string): Promise<{ message: string }> {
+  return parseResponse(
+    fetch(`${API_BASE_URL}/api/auth/verify-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code }),
     })
   );
 }
