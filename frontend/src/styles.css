@@ -107,6 +107,21 @@ body {
   line-height: 1.55;
 }
 
+.auth-logo-link {
+  width: max-content;
+  margin-bottom: 18px;
+  display: inline-grid;
+  color: #062b43;
+  text-decoration: none;
+  transition: color .18s ease, transform .18s ease;
+}
+
+.auth-logo-link:hover,
+.auth-logo-link:focus-visible {
+  color: #009d91;
+  transform: translateY(-1px);
+}
+
 .auth-form {
   width: min(92vw, 420px);
   display: grid;

@@ -29,6 +29,17 @@ class SignupRequest(BaseModel):
     health_center: str = Field(min_length=2)
 
 
+class EmailVerificationRequest(BaseModel):
+    email: str = Field(min_length=3)
+    code: str = Field(min_length=6, max_length=6)
+
+
+class SignupResponse(BaseModel):
+    message: str
+    verification_required: bool = True
+    development_code: str | None = None
+
+
 class PasswordResetRequest(BaseModel):
     email: str = Field(min_length=3)
 

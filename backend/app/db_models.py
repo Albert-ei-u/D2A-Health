@@ -1,4 +1,6 @@
-from sqlalchemy import Boolean, Float, Integer, String
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, Float, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -48,3 +50,14 @@ class UserRow(Base):
     role: Mapped[str] = mapped_column(String(80), nullable=False)
     health_center: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     dataset_ready: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class VerificationCodeRow(Base):
+    __tablename__ = "verification_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(320), index=True, nullable=False)
+    purpose: Mapped[str] = mapped_column(String(30), nullable=False)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

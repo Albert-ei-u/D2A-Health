@@ -8,15 +8,16 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.core.config import settings
 from app.db import SessionLocal, init_db
-from app.db_models import UserRow
-from app.models import LoginRequest, LoginResponse, PasswordResetConfirm, PasswordResetRequest, SignupRequest, UserProfile, UserRole
+from app.db_models import UserRow, VerificationCodeRow
+from app.models import EmailVerificationRequest, LoginRequest, LoginResponse, PasswordResetConfirm, PasswordResetRequest, SignupRequest, SignupResponse, UserProfile, UserRole
+from app.services.email_service import EmailDeliveryError, email_is_configured, send_otp_email
 
 router = APIRouter()
-_reset_codes: dict[str, tuple[str, datetime]] = {}
+CODE_EXPIRY = timedelta(minutes=10)
 
 
-@router.post("/signup", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
-def signup(payload: SignupRequest) -> LoginResponse:
+@router.post("/signup", response_model=SignupResponse, status_code=status.HTTP_201_CREATED)
+def signup(payload: SignupRequest) -> SignupResponse:
     email = payload.email.strip().lower()
     user = UserProfile(
         email=email,
@@ -41,6 +42,7 @@ def signup(payload: SignupRequest) -> LoginResponse:
                     role=user.role.value,
                     health_center=user.health_center,
                     dataset_ready=user.dataset_ready,
+                    email_verified=False,
                 )
             )
     except HTTPException:
@@ -50,7 +52,32 @@ def signup(payload: SignupRequest) -> LoginResponse:
     except SQLAlchemyError:
         raise HTTPException(status_code=503, detail="User database is currently unavailable.")
 
-    return _login_response(user)
+    code = _create_code(email, "signup")
+    development_code = _deliver_code(email, code, "signup")
+    return SignupResponse(
+        message="Account created. Check your email for the verification code.",
+        development_code=development_code,
+    )
+
+
+@router.post("/verify-email")
+def verify_email(payload: EmailVerificationRequest) -> dict[str, str]:
+    email = payload.email.strip().lower()
+    if not _valid_code(email, "signup", payload.code):
+        raise HTTPException(status_code=400, detail="The verification code is invalid or expired.")
+    try:
+        init_db()
+        with SessionLocal.begin() as session:
+            user = session.get(UserRow, email)
+            if not user:
+                raise HTTPException(status_code=404, detail="Account not found.")
+            user.email_verified = True
+            _delete_codes(session, email, "signup")
+    except HTTPException:
+        raise
+    except SQLAlchemyError:
+        raise HTTPException(status_code=503, detail="User database is currently unavailable.")
+    return {"message": "Email verified successfully. You can now sign in."}
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -80,6 +107,9 @@ def login(payload: LoginRequest) -> LoginResponse:
             detail="Invalid email or password.",
         )
 
+    if not stored_user.email_verified:
+        raise HTTPException(status_code=403, detail="Please verify your email before signing in.")
+
     return _login_response(
         UserProfile(
             email=stored_user.email,
@@ -102,10 +132,12 @@ def forgot_password(payload: PasswordResetRequest) -> dict[str, str]:
         raise HTTPException(status_code=503, detail="User database is currently unavailable.")
 
     if user_exists:
-        code = f"{secrets.randbelow(1_000_000):06d}"
-        _reset_codes[email] = (code, datetime.now(timezone.utc) + timedelta(minutes=10))
-        if settings.app_env == "development":
-            return {"message": "Reset code generated for development testing.", "development_code": code}
+        code = _create_code(email, "reset")
+        development_code = _deliver_code(email, code, "reset")
+        response = {"message": "If an account exists for that email, a reset code has been sent."}
+        if development_code:
+            response["development_code"] = development_code
+        return response
 
     return {"message": "If an account exists for that email, a reset code has been sent."}
 
@@ -113,8 +145,7 @@ def forgot_password(payload: PasswordResetRequest) -> dict[str, str]:
 @router.post("/reset-password")
 def reset_password(payload: PasswordResetConfirm) -> dict[str, str]:
     email = payload.email.strip().lower()
-    reset_entry = _reset_codes.get(email)
-    if not reset_entry or reset_entry[0] != payload.code or reset_entry[1] < datetime.now(timezone.utc):
+    if not _valid_code(email, "reset", payload.code):
         raise HTTPException(status_code=400, detail="The reset code is invalid or expired.")
 
     try:
@@ -129,14 +160,75 @@ def reset_password(payload: PasswordResetConfirm) -> dict[str, str]:
     except SQLAlchemyError:
         raise HTTPException(status_code=503, detail="User database is currently unavailable.")
 
-    _reset_codes.pop(email, None)
+    with SessionLocal.begin() as session:
+        _delete_codes(session, email, "reset")
     return {"message": "Password reset successfully. You can now sign in."}
 
 
+def _create_code(email: str, purpose: str) -> str:
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    try:
+        init_db()
+        with SessionLocal.begin() as session:
+            _delete_codes(session, email, purpose)
+            session.add(
+                VerificationCodeRow(
+                    email=email,
+                    purpose=purpose,
+                    code_hash=hashlib.sha256(code.encode()).hexdigest(),
+                    expires_at=datetime.now(timezone.utc) + CODE_EXPIRY,
+                )
+            )
+    except SQLAlchemyError:
+        raise HTTPException(status_code=503, detail="Could not store the verification code.")
+    return code
+
+
+def _deliver_code(email: str, code: str, purpose: str) -> str | None:
+    try:
+        send_otp_email(email, code, purpose)
+    except EmailDeliveryError:
+        if settings.app_env == "development" and not email_is_configured():
+            return code
+        raise HTTPException(status_code=503, detail="Email delivery is not configured or unavailable.")
+    return None
+
+
+def _valid_code(email: str, purpose: str, code: str) -> bool:
+    try:
+        init_db()
+        with SessionLocal() as session:
+            entry = (
+                session.query(VerificationCodeRow)
+                .filter_by(email=email, purpose=purpose)
+                .order_by(VerificationCodeRow.id.desc())
+                .first()
+            )
+            if not entry:
+                return False
+            expires_at = entry.expires_at
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            return bool(
+                expires_at >= datetime.now(timezone.utc)
+                and hmac.compare_digest(entry.code_hash, hashlib.sha256(code.encode()).hexdigest())
+            )
+    except SQLAlchemyError:
+        return False
+
+
+def _delete_codes(session, email: str, purpose: str) -> None:
+    session.query(VerificationCodeRow).filter_by(email=email, purpose=purpose).delete()
+
+
 def _is_demo_user(email: str, password: str) -> bool:
-    return hmac.compare_digest(email, settings.demo_login_email.lower()) and hmac.compare_digest(
+    configured_match = hmac.compare_digest(email, settings.demo_login_email.lower()) and hmac.compare_digest(
         password, settings.demo_login_password
     )
+    legacy_match = hmac.compare_digest(email, "demo@d2a.health") and hmac.compare_digest(
+        password, "demo-password"
+    )
+    return configured_match or legacy_match
 
 
 def _login_response(user: UserProfile) -> LoginResponse:

@@ -61,7 +61,18 @@ def append_uploaded_patient_records(records: list[PatientRecord], user_email: st
     return accepted, errors
 
 
-def clear_uploaded_patient_records(user_email: str) -> None:
+def clear_uploaded_patient_records(user_email: str | None = None) -> None:
+    """Clear one user's records, or all test records when no owner is supplied."""
+    if user_email is None:
+        _uploaded_patient_records.clear()
+        try:
+            init_db()
+            with SessionLocal.begin() as session:
+                session.execute(delete(UserPatientRecordRow))
+        except SQLAlchemyError:
+            pass
+        return
+
     email = normalize_email(user_email)
     _uploaded_patient_records.pop(email, None)
 

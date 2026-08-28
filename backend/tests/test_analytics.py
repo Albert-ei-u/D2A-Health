@@ -21,6 +21,8 @@ from app.services import insight_engine
 from app.services.dataset_store import clear_uploaded_patient_records
 from app.services.synthetic_data import build_environmental_signals, build_patient_records
 
+TEST_USER_EMAIL = "analytics-test@example.com"
+
 
 def test_dashboard_aggregations_are_populated() -> None:
     records = build_patient_records()
@@ -75,7 +77,7 @@ def test_ai_pipeline_returns_traceable_outputs() -> None:
 
 def test_dashboard_endpoint_returns_mvp_analysis_sections() -> None:
     clear_uploaded_patient_records()
-    response = TestClient(app).get("/api/dashboard")
+    response = TestClient(app).get("/api/dashboard", headers={"X-User-Email": TEST_USER_EMAIL})
 
     assert response.status_code == 200
     payload = response.json()
@@ -126,9 +128,10 @@ def test_csv_upload_becomes_active_dataset_for_dashboard() -> None:
     upload_response = client.post(
         "/api/ingestion/patient-csv",
         files={"file": ("records.csv", csv_content, "text/csv")},
+        headers={"X-User-Email": TEST_USER_EMAIL},
     )
-    dashboard_response = client.get("/api/dashboard")
-    clear_response = client.delete("/api/ingestion/patient-csv")
+    dashboard_response = client.get("/api/dashboard", headers={"X-User-Email": TEST_USER_EMAIL})
+    clear_response = client.delete("/api/ingestion/patient-csv", headers={"X-User-Email": TEST_USER_EMAIL})
 
     assert upload_response.status_code == 200
     assert upload_response.json()["accepted_records"] == 4
@@ -156,9 +159,10 @@ def test_csv_upload_can_supply_exact_map_locations() -> None:
     client.post(
         "/api/ingestion/patient-csv",
         files={"file": ("records.csv", csv_content, "text/csv")},
+        headers={"X-User-Email": TEST_USER_EMAIL},
     )
-    response = client.get("/api/records/locations")
-    clear_uploaded_patient_records()
+    response = client.get("/api/records/locations", headers={"X-User-Email": TEST_USER_EMAIL})
+    clear_uploaded_patient_records(TEST_USER_EMAIL)
 
     assert response.status_code == 200
     locations = response.json()
