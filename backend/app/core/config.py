@@ -26,6 +26,12 @@ class Settings:
     smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "")
     smtp_use_tls: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
     smtp_timeout_seconds: float = float(os.getenv("SMTP_TIMEOUT_SECONDS", "10"))
+    email_provider: str = os.getenv("EMAIL_PROVIDER", "smtp").lower()
+    brevo_api_key: str = os.getenv("BREVO_API_KEY", "")
+    email_from: str = os.getenv("EMAIL_FROM", "")
+    email_from_name: str = os.getenv("EMAIL_FROM_NAME", "D2A Health")
+    email_logo_url: str = os.getenv("EMAIL_LOGO_URL", "")
+    email_timeout_seconds: float = float(os.getenv("EMAIL_TIMEOUT_SECONDS", "10"))
 
 
 settings = Settings()
