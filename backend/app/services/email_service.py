@@ -1,4 +1,5 @@
 import json
+import logging
 import smtplib
 import urllib.error
 import urllib.request
@@ -7,13 +8,23 @@ from email.message import EmailMessage
 from app.core.config import settings
 
 
+logger = logging.getLogger(__name__)
+
+
 class EmailDeliveryError(RuntimeError):
     pass
 
 
 def email_is_configured() -> bool:
     if settings.email_provider == "brevo":
-        return bool(settings.brevo_api_key and settings.email_from)
+        configured = bool(settings.brevo_api_key and settings.email_from)
+        if not configured:
+            logger.error(
+                "Brevo email is not configured: BREVO_API_KEY=%s, EMAIL_FROM=%s",
+                "set" if settings.brevo_api_key else "missing",
+                "set" if settings.email_from else "missing",
+            )
+        return configured
     return all((settings.smtp_host, settings.smtp_username, settings.smtp_password, settings.smtp_from_email))
 
 
@@ -50,7 +61,15 @@ def _send_with_brevo(recipient: str, subject: str, text: str, html: str) -> None
         with urllib.request.urlopen(request, timeout=settings.email_timeout_seconds) as response:
             if response.status < 200 or response.status >= 300:
                 raise EmailDeliveryError("Brevo rejected the email request.")
-    except (OSError, urllib.error.HTTPError, urllib.error.URLError) as error:
+    except urllib.error.HTTPError as error:
+        provider_body = error.read().decode("utf-8", errors="replace")[:500]
+        logger.error("Brevo API rejected email: HTTP %s: %s", error.code, provider_body)
+        raise EmailDeliveryError("Brevo could not deliver the code.") from error
+    except urllib.error.URLError as error:
+        logger.error("Brevo API connection failed: %s", error.reason)
+        raise EmailDeliveryError("Brevo could not deliver the code.") from error
+    except OSError as error:
+        logger.error("Brevo email request failed: %s", error)
         raise EmailDeliveryError("Brevo could not deliver the code.") from error
 
 
