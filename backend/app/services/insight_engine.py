@@ -18,7 +18,10 @@ from app.services.tracing import ServiceTrace
 
 
 def generate_insights(
-    records: list[PatientRecord], environmental_signals: list[EnvironmentalSignal]
+    records: list[PatientRecord],
+    environmental_signals: list[EnvironmentalSignal],
+    *,
+    include_gemini: bool = True,
 ) -> list[Insight]:
     trace = ServiceTrace("insight-generation")
     trace.add("input", "Loaded records and environmental context.", record_count=len(records))
@@ -229,41 +232,43 @@ def generate_insights(
             )
         )
 
-    gemini_result = generate_gemini_health_insight(
-        {
-            "latest_total_visits": latest_volume,
-            "previous_total_visits": previous_volume,
-            "growth_percent": growth,
-            "top_conditions": ranked_conditions[:3],
-            "fastest_rising_trend": fastest_rising,
-            "highest_volume_pressure": highest_pressure,
-            "strongest_anomaly": (
-                {
-                    "district": strongest_anomaly.district,
-                    "condition": strongest_anomaly.condition,
-                    "current_week": strongest_anomaly.current_week,
-                    "current_visits": strongest_anomaly.current_visits,
-                    "baseline_visits": strongest_anomaly.baseline_visits,
-                    "percent_change": strongest_anomaly.percent_change,
-                    "score": strongest_anomaly.score,
-                }
-                if strongest_anomaly
-                else None
-            ),
-            "highest_rainfall": (
-                {
-                    "district": highest_rainfall.district,
-                    "week": highest_rainfall.week,
-                    "rainfall_mm": highest_rainfall.rainfall_mm,
-                    "temperature_c": highest_rainfall.temperature_c,
-                    "air_quality_index": highest_rainfall.air_quality_index,
-                }
-                if highest_rainfall
-                else None
-            ),
-            "priority_locations": priority_locations,
-        }
-    )
+    gemini_result = None
+    if include_gemini:
+        gemini_result = generate_gemini_health_insight(
+            {
+                "latest_total_visits": latest_volume,
+                "previous_total_visits": previous_volume,
+                "growth_percent": growth,
+                "top_conditions": ranked_conditions[:3],
+                "fastest_rising_trend": fastest_rising,
+                "highest_volume_pressure": highest_pressure,
+                "strongest_anomaly": (
+                    {
+                        "district": strongest_anomaly.district,
+                        "condition": strongest_anomaly.condition,
+                        "current_week": strongest_anomaly.current_week,
+                        "current_visits": strongest_anomaly.current_visits,
+                        "baseline_visits": strongest_anomaly.baseline_visits,
+                        "percent_change": strongest_anomaly.percent_change,
+                        "score": strongest_anomaly.score,
+                    }
+                    if strongest_anomaly
+                    else None
+                ),
+                "highest_rainfall": (
+                    {
+                        "district": highest_rainfall.district,
+                        "week": highest_rainfall.week,
+                        "rainfall_mm": highest_rainfall.rainfall_mm,
+                        "temperature_c": highest_rainfall.temperature_c,
+                        "air_quality_index": highest_rainfall.air_quality_index,
+                    }
+                    if highest_rainfall
+                    else None
+                ),
+                "priority_locations": priority_locations,
+            }
+        )
     if gemini_result:
         insights.insert(
             0,

@@ -52,6 +52,7 @@ def get_dashboard(x_user_email: str | None = Header(default=None, alias="X-User-
         anomaly_signals=anomaly_summary(records),
         environmental_context=current_environment(environmental_signals),
         alerts=alerts,
-        insights=generate_insights(records, environmental_signals),
+        # Keep the initial dashboard independent of the external Gemini request.
+        insights=generate_insights(records, environmental_signals, include_gemini=False),
         district_forecasts=district_forecasts,
     )
