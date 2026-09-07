@@ -15,7 +15,7 @@ export function HtmlScreens() {
   useEffect(() => { if (activeId === "dashboard" && user && !user.dataset_ready && !localStorage.getItem("d2a_has_uploaded_data")) window.location.hash = "upload"; }, [activeId, user]);
   if (activeId === "signup") return <SignupScreen />;
   if (activeId === "login") return <LoginScreen />;
-  if (activeId === "forgot-password") return <ForgotPasswordScreen />;
+  if (activeId === "forgot-password") return <ForgotPasswordFlow />;
   if (activeId === "reset-password") return <ResetPasswordScreen />;
   if (activeId === "upload") return <UploadScreen />;
   if (activeId === "landing") return <LandingScreen />;
@@ -142,6 +142,64 @@ function LoginScreen() { const [email, setEmail] = useState(""); const [password
 function UploadScreen() { const [file, setFile] = useState<File | null>(null); const [loading, setLoading] = useState(false); const [error, setError] = useState(""); async function submit(e: FormEvent) { e.preventDefault(); if (!file || loading) return; setLoading(true); setError(""); try { const result = await uploadPatientCsv(file, getUser()?.email); if (result.accepted_records) { localStorage.setItem("d2a_has_uploaded_data", "true"); window.location.hash = "dashboard"; } } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "Upload failed."); setLoading(false); } } return <main className="auth-layout"><section className="auth-branding"><a className="auth-logo-link" href="#landing" aria-label="Back to landing page" title="Back to landing page"><HeartPulse size={58} /></a><h1>Start with your health centre data.</h1><p>Upload an anonymized CSV to activate trends, alerts, and AI recommendations.</p></section><form className="auth-form" onSubmit={submit}><h2>Upload your first dataset</h2><input type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] || null)} required disabled={loading} />{error && <p className="form-error">{error}</p>}<button disabled={!file || loading}>{loading ? <><Spinner />Uploading...</> : "Upload and continue"}</button></form></main>; }
 
 function Spinner() { return <LoaderCircle className="button-spinner" size={17} aria-hidden="true" />; }
+
+function ForgotPasswordFlow() {
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [developmentCode, setDevelopmentCode] = useState("");
+  const [error, setError] = useState("");
+
+  async function requestCode(e: FormEvent) {
+    e.preventDefault();
+    if (loading) return;
+    setLoading(true);
+    setError("");
+    try {
+      const result = await requestPasswordReset(email);
+      sessionStorage.setItem("d2a_reset_email", email);
+      if (result.development_code) {
+        sessionStorage.setItem("d2a_reset_code", result.development_code);
+        setDevelopmentCode(result.development_code);
+      }
+      setMessage(result.message);
+      setSent(true);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to send reset code.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updatePassword(e: FormEvent) {
+    e.preventDefault();
+    if (loading) return;
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const result = await resetPassword(email, code, password);
+      sessionStorage.removeItem("d2a_reset_email");
+      sessionStorage.removeItem("d2a_reset_code");
+      setMessage(result.message);
+      setTimeout(() => { window.location.hash = "login"; }, 1200);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to reset password.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return <main className="auth-layout"><section className="auth-branding"><a className="auth-logo-link" href="#landing" aria-label="Back to landing page" title="Back to landing page"><HeartPulse size={58} /></a><h1>Get back to your health intelligence.</h1><p>We will help you securely reset your D2A account password.</p></section><form className="auth-form" onSubmit={sent ? updatePassword : requestCode}><h2>{sent ? "Create a new password" : "Forgot password?"}</h2><p>{sent ? "Enter the code from your email and choose a new password." : "Enter your account email and we will send you a reset code."}</p><input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={loading || sent} />{sent && <><input inputMode="numeric" pattern="[0-9]{6}" maxLength={6} placeholder="6-digit reset code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} required disabled={loading} />{message && <div className="reset-message"><strong>Code sent</strong><span>{message}</span>{developmentCode && <b>Development code: {developmentCode}</b>}</div>}<div className="password-field"><input type={showPassword ? "text" : "password"} minLength={8} placeholder="New password" value={password} onChange={(e) => setPassword(e.target.value)} required disabled={loading} /><button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)} title={showPassword ? "Hide password" : "Show password"} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div><div className="password-field"><input type={showPassword ? "text" : "password"} minLength={8} placeholder="Confirm new password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required disabled={loading} /></div><PasswordGuidance password={password} /></>}{error && <p className="form-error">{error}</p>}{message && !sent && <p className="form-success">{message}</p>}<button disabled={loading}>{loading ? <><Spinner />{sent ? "Updating password..." : "Sending code..."}</> : sent ? "Update password" : "Send reset code"}</button>{sent && <button type="button" className="secondary-action" onClick={() => { setSent(false); setMessage(""); setError(""); }} disabled={loading}>Use a different email</button>}<a href="#login">Back to login</a></form></main>;
+}
 
 function ForgotPasswordScreen() { const [email, setEmail] = useState(""); const [loading, setLoading] = useState(false); const [message, setMessage] = useState(""); const [code, setCode] = useState(""); const [error, setError] = useState(""); async function submit(e: FormEvent) { e.preventDefault(); if (loading) return; setLoading(true); setError(""); try { const result = await requestPasswordReset(email); sessionStorage.setItem("d2a_reset_email", email); if (result.development_code) { sessionStorage.setItem("d2a_reset_code", result.development_code); setCode(result.development_code); } setMessage(result.message); } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "Unable to send reset code."); } finally { setLoading(false); } } return <main className="auth-layout"><section className="auth-branding"><a className="auth-logo-link" href="#landing" aria-label="Back to landing page" title="Back to landing page"><HeartPulse size={58} /></a><h1>Get back to your health intelligence.</h1><p>We will help you securely reset your D2A account password.</p></section><form className="auth-form" onSubmit={submit}><h2>Forgot password?</h2><p>Enter your account email and we will send you a reset code.</p><input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={loading} />{message && <div className="reset-message"><strong>Reset code requested</strong><span>{message}</span>{code && <b>Development code: {code}</b>}</div>}{error && <p className="form-error">{error}</p>}<button disabled={loading}>{loading ? <><Spinner />Sending code...</> : "Send reset code"}</button><a href="#reset-password">I already have a code</a><a href="#login">Back to login</a></form></main>; }
 
